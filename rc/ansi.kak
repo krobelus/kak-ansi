@@ -77,31 +77,32 @@ define-command \
 
 hook -group ansi global BufCreate '\*stdin(?:-\d+)?\*' ansi-enable
 
-define-command -override -hidden -params ..3 man-impl %{ evaluate-commands %sh{
-    buffer_name="$1"
-    if [ -z "${buffer_name}" ]; then
-        exit
-    fi
-    shift
-    manout=$(mktemp "${TMPDIR:-/tmp}"/kak-man.XXXXXX)
-    manerr=$(mktemp "${TMPDIR:-/tmp}"/kak-man.XXXXXX)
-    env MANWIDTH=${kak_window_range##* } man "$@" > "$manout" 2> "$manerr"
-    retval=$?
+hook -once -group ansi global KakBegin '.*' %{
+    define-command -override -hidden -params ..3 man-impl %{ evaluate-commands %sh{
+        buffer_name="$1"
+        if [ -z "${buffer_name}" ]; then
+            exit
+        fi
+        shift
+        manout=$(mktemp "${TMPDIR:-/tmp}"/kak-man.XXXXXX)
+        manerr=$(mktemp "${TMPDIR:-/tmp}"/kak-man.XXXXXX)
+        env MANWIDTH=${kak_window_range##* } man "$@" > "$manout" 2> "$manerr"
+        retval=$?
 
-    if [ "${retval}" -eq 0 ]; then
-        printf %s\\n "
-                edit -scratch %{*$buffer_name ${*}*}
-                execute-keys '%|cat<space>${manout}<ret>gk'
-                ansi-enable
-                nop %sh{ rm ${manout} ${manerr} }
-                set-option buffer filetype man
-                set-option window manpage $buffer_name $*
-        "
-    else
-        printf '
-            fail %%{%s}
-            nop %%sh{ rm "%s" "%s" }
-        ' "$(cat "$manerr")" "${manout}" "${manerr}"
-    fi
-} }
-
+        if [ "${retval}" -eq 0 ]; then
+            printf %s\\n "
+                    edit -scratch %{*$buffer_name ${*}*}
+                    execute-keys '%|cat<space>${manout}<ret>gk'
+                    ansi-enable
+                    nop %sh{ rm ${manout} ${manerr} }
+                    set-option buffer filetype man
+                    set-option window manpage $buffer_name $*
+            "
+        else
+            printf '
+                fail %%{%s}
+                nop %%sh{ rm "%s" "%s" }
+            ' "$(cat "$manerr")" "${manout}" "${manerr}"
+        fi
+    } }
+}
